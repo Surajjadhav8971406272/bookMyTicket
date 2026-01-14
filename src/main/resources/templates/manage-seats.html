@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head>
+<meta charset="UTF-8">
+<title>Manage Seats | BookMyTicket</title>
+
+<link rel="icon" type="image/svg+xml" href="/favicon.svg">
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700;800&display=swap" rel="stylesheet">
+
+<style>
+:root {
+	--bg-main: #1c1f26;
+	--bg-card: #262a33;
+	--border-soft: #343842;
+	--text-main: #ffffff;
+	--text-muted: #c2c6cf;
+
+	--standard: #60a5fa;
+	--premium: #fbbf24;
+	--vip: #f87171;
+}
+
+/* ===== GLOBAL ===== */
+body {
+	font-family: "Poppins", sans-serif;
+	background: linear-gradient(180deg, #2b2f3a, #1c1f26);
+	color: var(--text-main);
+	min-height: 100vh;
+}
+
+/* ===== CONTAINER ===== */
+.container {
+	max-width: 1200px;
+	margin-top: 50px;
+}
+
+/* ===== SCREEN LABEL ===== */
+.screen-label {
+	text-align: center;
+	font-weight: 800;
+	margin-bottom: 40px;
+	padding: 14px;
+	letter-spacing: 2px;
+	border-radius: 14px;
+	background: var(--bg-card);
+	border: 1px solid var(--border-soft);
+	box-shadow: 0 20px 45px rgba(0,0,0,.6);
+	color: var(--text-muted);
+}
+
+/* ===== ROW ===== */
+.row-wrapper {
+	display: flex;
+	align-items: center;
+	margin-bottom: 16px;
+}
+
+.row-name {
+	width: 60px;
+	font-weight: 700;
+	color: var(--text-muted);
+	text-align: center;
+}
+
+/* ===== SEATS ===== */
+.seat {
+	width: 38px;
+	height: 38px;
+	border-radius: 8px;
+	margin: 5px;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	font-size: .75rem;
+	font-weight: 700;
+	cursor: default;
+	transition: all .2s ease;
+}
+
+/* Seat categories (Thymeleaf classappend untouched) */
+.STANDARD {
+	background: rgba(96,165,250,.15);
+	border: 1px solid var(--standard);
+	color: var(--standard);
+}
+
+.PREMIUM {
+	background: rgba(251,191,36,.18);
+	border: 1px solid var(--premium);
+	color: var(--premium);
+}
+
+.VIP {
+	background: rgba(248,113,113,.18);
+	border: 1px solid var(--vip);
+	color: var(--vip);
+}
+
+.seat:hover {
+	transform: translateY(-2px);
+	box-shadow: 0 8px 20px rgba(0,0,0,.5);
+}
+
+/* ===== ACTIONS ===== */
+.actions {
+	margin-top: 40px;
+	display: flex;
+	justify-content: flex-end;
+}
+
+.btn-back {
+	background: transparent;
+	border: 1px solid var(--border-soft);
+	color: var(--text-muted);
+	padding: .6rem 1.6rem;
+	border-radius: 10px;
+	font-weight: 600;
+	text-decoration: none;
+}
+
+.btn-back:hover {
+	border-color: #e53935;
+	color: #e53935;
+}
+
+/* ===== EMPTY STATE ===== */
+.empty-state {
+	text-align: center;
+	padding: 80px 30px;
+	background: var(--bg-card);
+	border-radius: 18px;
+	border: 1px solid var(--border-soft);
+	box-shadow: 0 20px 45px rgba(0,0,0,.6);
+}
+
+.empty-state h3 {
+	font-weight: 800;
+	margin-bottom: 10px;
+}
+
+.empty-state p {
+	color: var(--text-muted);
+	margin-bottom: 25px;
+}
+
+.btn-create {
+	background: #e53935;
+	color: #fff;
+	font-weight: 700;
+	padding: .75rem 1.8rem;
+	border-radius: 12px;
+	text-decoration: none;
+}
+
+.btn-create:hover {
+	background: #f44336;
+	color: #fff;
+}
+
+/* ===== RESPONSIVE ===== */
+@media (max-width:768px) {
+	.row-name {
+		width: 45px;
+		font-size: .85rem;
+	}
+	.seat {
+		width: 34px;
+		height: 34px;
+		margin: 4px;
+	}
+}
+</style>
+</head>
+
+<body>
+
+<div class="container">
+
+	<!-- ===== NO SEATS ===== -->
+	<div th:if="${#maps.isEmpty(seatsByRow)}" class="empty-state">
+		<h3>🎟️ No Seat Layout Found</h3>
+		<p>This screen does not have a seat layout yet.</p>
+
+		<a th:href="@{/add-seats/{id}(id=${screenId})}" class="btn-create">
+			+ Create Seat Layout
+		</a>
+	</div>
+
+	<!-- ===== SEATS EXIST ===== -->
+	<div th:if="${!#maps.isEmpty(seatsByRow)}">
+
+		<div class="screen-label">🎬 SCREEN THIS SIDE 🎬</div>
+
+		<!-- ROWS -->
+		<div th:each="rowEntry : ${seatsByRow}">
+			<div class="row-wrapper">
+				<div class="row-name" th:text="${rowEntry.key}"></div>
+
+				<div class="d-flex flex-wrap">
+					<div th:each="seat : ${rowEntry.value}"
+						 class="seat"
+						 th:classappend="${seat.category}"
+						 th:text="${seat.seatColumn}">
+					</div>
+				</div>
+			</div>
+		</div>
+
+		<!-- ACTIONS -->
+		<div class="actions">
+			<a href="/manage-theaters" class="btn-back">← Back</a>
+		</div>
+
+	</div>
+
+</div>
+
+</body>
+</html>

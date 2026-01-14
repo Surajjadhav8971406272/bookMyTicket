@@ -1,0 +1,280 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Add Movie | BookMyTicket</title>
+
+<link rel="icon" type="image/svg+xml" href="/favicon.svg">
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+
+<style>
+:root {
+	--bg-main: #1c1f26;
+	--bg-card: #262a33;
+	--border-soft: #343842;
+	--text-main: #ffffff;
+	--text-muted: #c2c6cf;
+	--accent: #e53935;
+	--danger: #ef4444;
+}
+
+/* ===== GLOBAL ===== */
+body {
+	font-family: "Poppins", sans-serif;
+	background: linear-gradient(180deg, #2b2f3a, #1c1f26);
+	min-height: 100vh;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	color: var(--text-main);
+	padding: 20px;
+}
+
+/* ===== CONTAINER ===== */
+.form-container {
+	width: 100%;
+	display: flex;
+	justify-content: center;
+}
+
+/* ===== CARD ===== */
+.form-box {
+	width: 100%;
+	max-width: 600px;
+	padding: 45px;
+	background: var(--bg-card);
+	border-radius: 16px;
+	border: 1px solid var(--border-soft);
+	box-shadow: 0 20px 45px rgba(0,0,0,0.6);
+	animation: fadeInUp .4s ease;
+}
+
+.form-box h1 {
+	text-align: center;
+	margin-bottom: 35px;
+	font-weight: 800;
+	font-size: 1.9rem;
+}
+
+/* ===== FORM ===== */
+.form-group {
+	margin-bottom: 20px;
+}
+
+label {
+	font-size: .85rem;
+	font-weight: 600;
+	color: var(--text-muted);
+	margin-bottom: 6px;
+}
+
+.form-control,
+.form-file {
+	background: #1f232b;
+	border: 1px solid var(--border-soft);
+	border-radius: 10px;
+	padding: 11px 14px;
+	color: var(--text-main);
+	font-size: .9rem;
+}
+
+.form-control::placeholder {
+	color: #9aa0ab;
+}
+
+.form-control:focus,
+.form-file:focus {
+	background: #1f232b;
+	border-color: var(--accent);
+	box-shadow: none;
+	color: var(--text-main);
+}
+
+textarea.form-control {
+	resize: none;
+}
+
+/* ===== FILE INPUT ===== */
+.form-file::file-selector-button {
+	background: var(--accent);
+	color: white;
+	border: none;
+	padding: 7px 14px;
+	border-radius: 6px;
+	font-weight: 600;
+	margin-right: 10px;
+	cursor: pointer;
+}
+
+.form-file::file-selector-button:hover {
+	background: #f44336;
+}
+
+/* ===== ERRORS ===== */
+.error-text {
+	color: var(--danger);
+	font-size: .75rem;
+	margin-top: 4px;
+	font-weight: 600;
+}
+
+/* ===== BUTTONS ===== */
+.button-group {
+	display: flex;
+	gap: 14px;
+	margin-top: 30px;
+}
+
+.btn-submit {
+	flex: 1;
+	background: var(--accent);
+	border: none;
+	color: white;
+	font-weight: 700;
+	padding: 12px;
+	border-radius: 10px;
+}
+
+.btn-submit:hover {
+	background: #f44336;
+}
+
+.btn-cancel {
+	flex: 1;
+	background: transparent;
+	border: 1px solid var(--border-soft);
+	color: var(--text-muted);
+	font-weight: 600;
+	padding: 12px;
+	border-radius: 10px;
+	text-align: center;
+	text-decoration: none;
+}
+
+.btn-cancel:hover {
+	border-color: var(--accent);
+	color: var(--accent);
+}
+
+/* ===== TOASTS ===== */
+.toastify-container {
+	position: fixed;
+	top: 20px;
+	right: 20px;
+	z-index: 9999;
+}
+
+.toastify {
+	min-width: 280px;
+	padding: 14px 18px;
+	border-radius: 10px;
+	color: white;
+	display: flex;
+	gap: 10px;
+	align-items: center;
+	box-shadow: 0 10px 30px rgba(0,0,0,0.4);
+	margin-bottom: 10px;
+	animation: slideIn .3s ease;
+}
+
+.toastify.success { background: #2ecc71; }
+.toastify.error { background: var(--danger); }
+
+@keyframes slideIn {
+	from { transform: translateX(300px); opacity: 0; }
+	to { transform: translateX(0); opacity: 1; }
+}
+
+@keyframes fadeInUp {
+	from { opacity: 0; transform: translateY(20px); }
+	to { opacity: 1; transform: translateY(0); }
+}
+
+@media (max-width:768px) {
+	.form-box { padding: 30px; }
+	.button-group { flex-direction: column; }
+}
+</style>
+</head>
+
+<body>
+
+<!-- TOASTS -->
+<div class="toastify-container">
+	<div th:if="${pass}" class="toastify success"><span th:text="${pass}"></span></div>
+	<div th:if="${fail}" class="toastify error"><span th:text="${fail}"></span></div>
+</div>
+
+<div class="form-container">
+	<div class="form-box">
+		<h1>🎬 Add Movie</h1>
+
+		<form action="/add-movie" method="post" th:object="${movieDto}" enctype="multipart/form-data">
+
+			<div class="form-group">
+				<label>Movie Name *</label>
+				<input class="form-control" th:field="*{name}">
+				<span class="error-text" th:errors="*{name}"></span>
+			</div>
+
+			<div class="form-group">
+				<label>Genre *</label>
+				<input class="form-control" th:field="*{genre}">
+				<span class="error-text" th:errors="*{genre}"></span>
+			</div>
+
+			<div class="form-group">
+				<label>Languages *</label>
+				<input class="form-control" th:field="*{languages}">
+				<span class="error-text" th:errors="*{languages}"></span>
+			</div>
+
+			<div class="form-group">
+				<label>Duration *</label>
+				<input type="time" class="form-control" th:field="*{duration}">
+				<span class="error-text" th:errors="*{duration}"></span>
+			</div>
+
+			<div class="form-group">
+				<label>Poster *</label>
+				<input type="file" class="form-file" th:field="*{image}" accept="image/*">
+				<span class="error-text" th:errors="*{image}"></span>
+			</div>
+
+			<div class="form-group">
+				<label>Trailer Link</label>
+				<input class="form-control" th:field="*{trailerLink}">
+			</div>
+
+			<div class="form-group">
+				<label>Description *</label>
+				<textarea class="form-control" rows="3" th:field="*{description}"></textarea>
+				<span class="error-text" th:errors="*{description}"></span>
+			</div>
+
+			<div class="form-group">
+				<label>Release Date *</label>
+				<input type="date" class="form-control" th:field="*{releaseDate}">
+				<span class="error-text" th:errors="*{releaseDate}"></span>
+			</div>
+
+			<div class="form-group">
+				<label>Cast *</label>
+				<input class="form-control" th:field="*{cast}">
+				<span class="error-text" th:errors="*{cast}"></span>
+			</div>
+
+			<div class="button-group">
+				<button class="btn-submit">Add Movie</button>
+				<a href="/manage-movies" class="btn-cancel">Cancel</a>
+			</div>
+
+		</form>
+	</div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

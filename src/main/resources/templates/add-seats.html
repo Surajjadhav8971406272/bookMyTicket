@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head>
+<meta charset="UTF-8">
+<title>Add Seats</title>
+
+<!-- Bootstrap -->
+<link
+	href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css"
+	rel="stylesheet">
+
+<style>
+body {
+	background: #f4f6f9;
+	font-family: 'Poppins', sans-serif;
+}
+
+.container {
+	max-width: 900px;
+	margin-top: 40px;
+}
+
+.card {
+	border-radius: 12px;
+	box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.row-block {
+	display: flex;
+	gap: 10px;
+	align-items: center;
+	margin-bottom: 12px;
+}
+
+.row-block input, .row-block select {
+	flex: 1;
+}
+
+.row-block button {
+	white-space: nowrap;
+}
+
+.add-row-btn {
+	margin-top: 15px;
+}
+</style>
+</head>
+
+<body>
+
+	<div class="container">
+
+		<div class="card">
+			<div class="card-header bg-primary text-white">
+				<h4 class="mb-0">Add Seat Layout</h4>
+			</div>
+
+			<div class="card-body">
+
+				<!-- Flash Messages -->
+				<div th:if="${success}" class="alert alert-success"
+					th:text="${success}"></div>
+				<div th:if="${fail}" class="alert alert-danger" th:text="${fail}"></div>
+
+				<!-- Seat Layout Form -->
+				<form th:action="@{/add-seats/{id}(id=${id})}"
+					th:object="${seatLayoutForm}" method="post">
+
+					<div id="rowsContainer"></div>
+
+					<button type="button" class="btn btn-outline-primary add-row-btn"
+						onclick="addRow()">➕ Add Row</button>
+
+					<hr>
+
+					<div class="d-flex justify-content-between">
+						<a th:href="'/manage-seats/'+${id}" class="btn btn-secondary"> Cancel </a>
+
+						<button type="submit" class="btn btn-success">Save Seat
+							Layout</button>
+					</div>
+
+				</form>
+
+			</div>
+		</div>
+
+	</div>
+
+	<script>
+    let rowIndex = 0;
+
+    function addRow() {
+        const container = document.getElementById("rowsContainer");
+
+        container.insertAdjacentHTML("beforeend", `
+            <div class="row-block">
+                <input type="text"
+                       class="form-control"
+                       name="rows[${rowIndex}].rowName"
+                       placeholder="Row Name (A, B, VIP)"
+                       required>
+
+                <input type="number"
+                       class="form-control"
+                       name="rows[${rowIndex}].totalSeats"
+                       placeholder="Seats"
+                       min="1"
+                       required>
+
+                <select class="form-select"
+                        name="rows[${rowIndex}].category"
+                        required>
+                    <option value="">Category</option>
+                    <option value="STANDARD">Standard</option>
+                    <option value="PREMIUM">Premium</option>
+                    <option value="VIP">VIP</option>
+                </select>
+
+                <button type="button"
+                        class="btn btn-danger"
+                        onclick="removeRow(this)">
+                    ❌
+                </button>
+            </div>
+        `);
+
+        rowIndex++;
+    }
+
+    function removeRow(button) {
+        button.parentElement.remove();
+    }
+</script>
+
+</body>
+</html>

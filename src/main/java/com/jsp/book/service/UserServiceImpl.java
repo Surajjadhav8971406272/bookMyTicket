@@ -1,0 +1,951 @@
+package com.jsp.book.service;
+
+import java.io.File;
+import java.io.IOException;
+import java.security.SecureRandom;
+import java.time.LocalDate;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.stream.Collectors;
+
+import org.json.JSONObject;
+import org.springframework.stereotype.Service;
+import org.springframework.ui.ModelMap;
+import org.springframework.validation.BindingResult;
+import org.springframework.web.multipart.MultipartFile;
+import org.springframework.web.servlet.mvc.support.RedirectAttributes;
+
+import com.google.zxing.WriterException;
+import com.jsp.book.dto.LoginDto;
+import com.jsp.book.dto.MovieDto;
+import com.jsp.book.dto.PasswordDto;
+import com.jsp.book.dto.ScreenDto;
+import com.jsp.book.dto.SeatLayoutForm;
+import com.jsp.book.dto.SeatRowDto;
+import com.jsp.book.dto.ShowDto;
+import com.jsp.book.dto.TheaterDto;
+import com.jsp.book.dto.UserDto;
+import com.jsp.book.entity.BookedTicket;
+import com.jsp.book.entity.Movie;
+import com.jsp.book.entity.Screen;
+import com.jsp.book.entity.Seat;
+import com.jsp.book.entity.Show;
+import com.jsp.book.entity.ShowSeat;
+import com.jsp.book.entity.Theater;
+import com.jsp.book.entity.User;
+import com.jsp.book.repository.MovieRepository;
+import com.jsp.book.repository.ScreenRepository;
+import com.jsp.book.repository.SeatRepository;
+import com.jsp.book.repository.ShowRepository;
+import com.jsp.book.repository.ShowSeatRepository;
+import com.jsp.book.repository.TheaterRepository;
+import com.jsp.book.repository.TicketRepository;
+import com.jsp.book.repository.UserRepository;
+import com.jsp.book.util.AES;
+import com.jsp.book.util.CloudinaryHelper;
+import com.jsp.book.util.EmailHelper;
+import com.jsp.book.util.QrHelper;
+import com.razorpay.Order;
+import com.razorpay.RazorpayClient;
+import com.razorpay.RazorpayException;
+
+import jakarta.servlet.http.HttpSession;
+import jakarta.validation.Valid;
+import lombok.RequiredArgsConstructor;
+
+@Service
+@RequiredArgsConstructor
+public class UserServiceImpl implements UserService {
+
+	private final UserRepository userRepository;
+	private final ShowSeatRepository showSeatRepository;
+	private final SecureRandom random;
+	private final EmailHelper emailHelper;
+	private final RedisService redisService;
+	private final TheaterRepository theaterRepository;
+	private final ScreenRepository screenRepository;
+	private final MovieRepository movieRepository;
+	private final CloudinaryHelper cloudinaryHelper;
+	private final SeatRepository seatRepository;
+	private final ShowRepository showRepository;
+	private final TicketRepository ticketRepository;
+	private final QrHelper qrHelper;
+	private String rzrKey = "rzp_test_RaPsJq0rZSFWD1";
+	private String rzrSecret = "ZO0swacFGMgyE71JVvGuBOFP";
+
+	@Override
+	public String register(UserDto userDto, BindingResult result, RedirectAttributes attributes) {
+		if (!userDto.getPassword().equals(userDto.getConfirmPassword()))
+			result.rejectValue("confirmPassword", "error.confirmPassword",
+					"* Password and ConfirmPassword Should be Same");
+		if (userRepository.existsByEmail(userDto.getEmail()))
+			result.rejectValue("email", "error.email", "* Email Should be unique");
+		if (userRepository.existsByMobile(userDto.getMobile()))
+			result.rejectValue("mobile", "error.mobile", "* Mobile Number Should be unique");
+
+		if (result.hasErrors())
+			return "register.html";
+
+		else {
+			int otp = random.nextInt(100000, 1000000);
+			emailHelper.sendOtp(otp, userDto.getName(), userDto.getEmail());
+			redisService.saveUserDto(userDto.getEmail(), userDto);
+			redisService.saveOtp(userDto.getEmail(), otp);
+			attributes.addFlashAttribute("pass", "Otp Sent Success");
+			attributes.addFlashAttribute("email", userDto.getEmail());
+			return "redirect:/otp";
+		}
+	}
+
+	@Override
+	public String login(LoginDto dto, RedirectAttributes attributes, HttpSession session) {
+		User user = userRepository.findByEmail(dto.getEmail());
+		if (user == null) {
+			attributes.addFlashAttribute("fail", "Invalid Email");
+			return "redirect:/login";
+		} else {
+			if (AES.decrypt(user.getPassword()).equals(dto.getPassword())) {
+				if (user.isBlocked()) {
+					attributes.addFlashAttribute("fail", "Account Blocked!, Contact Admin");
+					return "redirect:/login";
+				}
+				session.setAttribute("user", user);
+				attributes.addFlashAttribute("pass", "Login Success");
+				return "redirect:/main";
+			} else {
+				attributes.addFlashAttribute("fail", "Invalid Password");
+				return "redirect:/login";
+			}
+		}
+	}
+
+	@Override
+	public String logout(HttpSession session, RedirectAttributes attributes) {
+		session.removeAttribute("user");
+		attributes.addFlashAttribute("pass", "Logout Success");
+		return "redirect:/main";
+	}
+
+	@Override
+	public String submitOtp(int otp, String email, RedirectAttributes attributes) {
+		UserDto dto = redisService.getDtoByEmail(email);
+		if (dto == null) {
+			attributes.addFlashAttribute("fail", "Timeout Try Again Creating a New Account");
+			return "redirect:/register";
+		} else {
+			int exOtp = redisService.getOtpByEmail(email);
+			if (exOtp == 0) {
+				attributes.addFlashAttribute("fail", "OTP Expired, Resend Otp and Try Again");
+				attributes.addFlashAttribute("email", email);
+				return "redirect:/otp";
+			} else {
+				if (otp == exOtp) {
+					User user = new User(null, dto.getName(), dto.getEmail(), dto.getMobile(),
+							AES.encrypt(dto.getPassword()), "USER", false);
+					userRepository.save(user);
+					attributes.addFlashAttribute("pass", "Account Registered Success");
+					return "redirect:/main";
+
+				} else {
+					attributes.addFlashAttribute("fail", "Invalid OTP Try Again");
+					attributes.addFlashAttribute("email", email);
+					return "redirect:/otp";
+				}
+			}
+		}
+	}
+
+	@Override
+	public String resendOtp(String email, RedirectAttributes attributes) {
+		UserDto dto = redisService.getDtoByEmail(email);
+		if (dto == null) {
+			attributes.addFlashAttribute("fail", "Timeout Try Again Creating a New Account");
+			return "redirect:/register";
+		} else {
+			int otp = random.nextInt(100000, 1000000);
+			emailHelper.sendOtp(otp, dto.getName(), dto.getEmail());
+			redisService.saveOtp(dto.getEmail(), otp);
+			attributes.addFlashAttribute("pass", "Otp Re-Sent Success");
+			attributes.addFlashAttribute("email", dto.getEmail());
+			return "redirect:/otp";
+		}
+	}
+
+	@Override
+	public String forgotPassword(String email, RedirectAttributes attributes) {
+		User user = userRepository.findByEmail(email);
+		if (user == null) {
+			attributes.addFlashAttribute("fail", "Invalid Email");
+			return "redirect:/forgot-password";
+		} else {
+			int otp = random.nextInt(100000, 1000000);
+			emailHelper.sendOtp(otp, user.getName(), email);
+			redisService.saveOtp(email, otp);
+			attributes.addFlashAttribute("pass", "Sent Success");
+			attributes.addFlashAttribute("email", email);
+			return "redirect:/reset-password";
+		}
+	}
+
+	@Override
+	public String resetPassword(PasswordDto passwordDto, BindingResult result, RedirectAttributes attributes,
+			ModelMap map) {
+		if (result.hasErrors()) {
+			map.put("email", passwordDto.getEmail());
+			return "reset-password.html";
+		}
+		User user = userRepository.findByEmail(passwordDto.getEmail());
+		if (user == null) {
+			attributes.addFlashAttribute("fail", "Invalid Email");
+			return "redirect:/forgot-password";
+		} else {
+			int exOtp = redisService.getOtpByEmail(passwordDto.getEmail());
+			if (exOtp == 0) {
+				attributes.addFlashAttribute("fail", "OTP Expired, Resend Otp and Try Again");
+				attributes.addFlashAttribute("email", passwordDto.getEmail());
+				return "redirect:/reset-password";
+			} else {
+				if (passwordDto.getOtp() == exOtp) {
+					user.setPassword(AES.encrypt(passwordDto.getPassword()));
+					userRepository.save(user);
+					attributes.addFlashAttribute("pass", "Password Reset Success");
+					return "redirect:/main";
+
+				} else {
+					attributes.addFlashAttribute("fail", "Invalid OTP Try Again");
+					attributes.addFlashAttribute("email", passwordDto.getEmail());
+					return "redirect:/reset-password";
+				}
+			}
+
+		}
+	}
+
+	@Override
+	public String manageUsers(HttpSession session, RedirectAttributes attributes, ModelMap map) {
+		User user = getUserFromSession(session);
+		if (user == null || !user.getRole().equals("ADMIN")) {
+			attributes.addFlashAttribute("fail", "Invalid Session");
+			return "redirect:/login";
+		} else {
+			List<User> users = userRepository.findByRole("USER");
+			if (users.isEmpty()) {
+				attributes.addFlashAttribute("fail", "No Users Registered Yet");
+				return "redirect:/";
+			} else {
+				map.put("users", users);
+				return "manage-users.html";
+			}
+		}
+	}
+
+	@Override
+	public String blockUser(Long id, HttpSession session, RedirectAttributes attributes) {
+		User user = getUserFromSession(session);
+		if (user == null || !user.getRole().equals("ADMIN")) {
+			attributes.addFlashAttribute("fail", "Invalid Session");
+			return "redirect:/login";
+		} else {
+			User user1 = userRepository.findById(id).orElse(null);
+			if (user1 == null) {
+				attributes.addFlashAttribute("fail", "Invalid Session");
+				return "redirect:/login";
+			}
+			user1.setBlocked(true);
+			userRepository.save(user1);
+			attributes.addFlashAttribute("pass", "Blocked Success");
+			return "redirect:/manage-users";
+		}
+	}
+
+	@Override
+	public String unBlockUser(Long id, HttpSession session, RedirectAttributes attributes) {
+		User user = getUserFromSession(session);
+		if (user == null || !user.getRole().equals("ADMIN")) {
+			attributes.addFlashAttribute("fail", "Invalid Session");
+			return "redirect:/login";
+		} else {
+			User user1 = userRepository.findById(id).orElse(null);
+			if (user1 == null) {
+				attributes.addFlashAttribute("fail", "Invalid Session");
+				return "redirect:/login";
+			}
+			user1.setBlocked(false);
+			userRepository.save(user1);
+			attributes.addFlashAttribute("pass", "Un-Blocked Success");
+			return "redirect:/manage-users";
+		}
+	}
+
+	private User getUserFromSession(HttpSession session) {
+		return (User) session.getAttribute("user");
+	}
+
+	@Override
+	public String manageTheater(ModelMap map, RedirectAttributes attributes, HttpSession session) {
+		User user = getUserFromSession(session);
+		if (user == null || !user.getRole().equals("ADMIN")) {
+			attributes.addFlashAttribute("fail", "Invalid Session");
+			return "redirect:/login";
+		} else {
+			List<Theater> theaters = theaterRepository.findAll();
+			map.put("theaters", theaters);
+			return "manage-theaters.html";
+		}
+	}
+
+	@Override
+	public String loadAddTheater(HttpSession session, RedirectAttributes attributes, TheaterDto theaterDto) {
+		User user = getUserFromSession(session);
+		if (user == null || !user.getRole().equals("ADMIN")) {
+			attributes.addFlashAttribute("fail", "Invalid Session");
+			return "redirect:/login";
+		} else {
+			return "add-theater.html";
+		}
+	}
+
+	@Override
+	public String addTheater(HttpSession session, RedirectAttributes attributes, @Valid TheaterDto theaterDto,
+			BindingResult result) throws IOException {
+
+		User user = getUserFromSession(session);
+		if (user == null || !user.getRole().equals("ADMIN")) {
+			attributes.addFlashAttribute("fail", "Invalid Session");
+			return "redirect:/login";
+		}
+
+		if (theaterRepository.existsByNameAndAddress(theaterDto.getName(), theaterDto.getAddress())) {
+			result.rejectValue("name", "error.name", "* Theater Already Exists");
+		}
+
+		MultipartFile image = theaterDto.getImage();
+		if (image.isEmpty()) {
+			result.rejectValue("image", "error.image", "* Image is Required");
+		}
+
+		if (result.hasErrors()) {
+			return "add-theater.html";
+		}
+
+		Theater theater = new Theater();
+		theater.setName(theaterDto.getName());
+		theater.setAddress(theaterDto.getAddress());
+		theater.setLocationLink(theaterDto.getLocationLink());
+		theater.setImageLocation(cloudinaryHelper.getTheaterImageLink(image));
+
+		theaterRepository.save(theater);
+
+		attributes.addFlashAttribute("pass", "Theater Added Successfully");
+		return "redirect:/manage-theaters";
+	}
+
+	@Override
+	public String deleteTheater(Long id, HttpSession session, RedirectAttributes attributes) {
+		User user = getUserFromSession(session);
+		if (user == null || !user.getRole().equals("ADMIN")) {
+			attributes.addFlashAttribute("fail", "Invalid Session");
+			return "redirect:/login";
+		} else {
+			Theater theater = theaterRepository.findById(id).orElseThrow();
+			if (theater.getScreenCount() != 0) {
+				attributes.addFlashAttribute("fail", "First Remove The Screens to Remove Theater");
+				return "redirect:/manage-theaters";
+			} else {
+				theaterRepository.deleteById(id);
+				attributes.addFlashAttribute("pass", "Theater Removed Success");
+				return "redirect:/manage-theaters";
+			}
+		}
+	}
+
+	@Override
+	public String editTheater(Long id, HttpSession session, RedirectAttributes attributes, ModelMap map) {
+		User user = getUserFromSession(session);
+		if (user == null || !user.getRole().equals("ADMIN")) {
+			attributes.addFlashAttribute("fail", "Invalid Session");
+			return "redirect:/login";
+		} else {
+			Theater theater = theaterRepository.findById(id).orElse(null);
+			TheaterDto theaterDto = new TheaterDto(theater.getName(), theater.getAddress(), theater.getLocationLink(),
+					null);
+			map.put("id", theater.getId());
+			map.put("imageLink", theater.getImageLocation());
+			map.put("theaterDto", theaterDto);
+			return "edit-theater.html";
+		}
+	}
+
+	@Override
+	public String updateTheater(HttpSession session, RedirectAttributes attributes, @Valid TheaterDto theaterDto,
+			BindingResult result, Long id) {
+		User user = getUserFromSession(session);
+		if (user == null || !user.getRole().equals("ADMIN")) {
+			attributes.addFlashAttribute("fail", "Invalid Session");
+			return "redirect:/login";
+		} else {
+			Theater theater = new Theater();
+			theater.setId(id);
+			theater.setName(theaterDto.getName());
+			theater.setAddress(theaterDto.getAddress());
+			theater.setLocationLink(theaterDto.getLocationLink());
+
+			MultipartFile image = theaterDto.getImage();
+			if (image.isEmpty()) {
+				theater.setImageLocation(theaterRepository.findById(id).get().getImageLocation());
+			} else {
+				String baseUploadDir = System.getProperty("user.dir") + "/uploads/theaters/";
+				File directory = new File(baseUploadDir);
+				if (!directory.exists())
+					directory.mkdirs();
+				String filename = theaterDto.getName() + image.getOriginalFilename();
+				File destination = new File(directory, filename);
+				try {
+					image.transferTo(destination);
+				} catch (IllegalStateException e) {
+					e.printStackTrace();
+				} catch (IOException e) {
+					e.printStackTrace();
+				}
+				theater.setImageLocation("/uploads/theaters/" + filename);
+			}
+			theaterRepository.save(theater);
+			attributes.addFlashAttribute("pass", "Theater Updated Successfully");
+			return "redirect:/manage-theaters";
+		}
+	}
+
+	@Override
+	public String manageScreens(Long id, HttpSession session, RedirectAttributes attributes, ModelMap map) {
+		User user = getUserFromSession(session);
+		if (user == null || !user.getRole().equals("ADMIN")) {
+			attributes.addFlashAttribute("fail", "Invalid Session");
+			return "redirect:/login";
+		} else {
+			Theater theater = theaterRepository.findById(id).get();
+			List<Screen> screens = screenRepository.findByTheater(theater);
+			map.put("screens", screens);
+			map.put("id", id);
+			return "manage-screens.html";
+		}
+	}
+
+	@Override
+	public String addScreen(Long id, HttpSession session, RedirectAttributes attributes, ModelMap map,
+			ScreenDto screenDto) {
+		User user = getUserFromSession(session);
+		if (user == null || !user.getRole().equals("ADMIN")) {
+			attributes.addFlashAttribute("fail", "Invalid Session");
+			return "redirect:/login";
+		} else {
+			theaterRepository.findById(id).get();
+			screenDto.setTheaterId(id);
+			map.put("screenDto", screenDto);
+			return "add-screen.html";
+		}
+	}
+
+	@Override
+	public String addScreen(ScreenDto screenDto, BindingResult result, HttpSession session,
+			RedirectAttributes attributes) {
+		User user = getUserFromSession(session);
+		if (user == null || !user.getRole().equals("ADMIN")) {
+			attributes.addFlashAttribute("fail", "Invalid Session");
+			return "redirect:/login";
+		} else {
+			Theater theater = theaterRepository.findById(screenDto.getTheaterId()).get();
+			if (screenRepository.existsByNameAndTheater(screenDto.getName(), theater)) {
+				result.rejectValue("name", "error.name", "* Screen Already Exist in The Theater");
+			}
+			if (result.hasErrors())
+				return "add-screen.html";
+			else {
+				Screen screen = new Screen();
+				screen.setName(screenDto.getName());
+				screen.setTheater(theater);
+				screen.setType(screenDto.getType());
+				screenRepository.save(screen);
+				theater.setScreenCount(theater.getScreenCount() + 1);
+				theaterRepository.save(theater);
+				attributes.addFlashAttribute("pass", "Screen Added Success");
+				return "redirect:/manage-screens/" + theater.getId();
+			}
+		}
+	}
+
+	@Override
+	public String deleteScreen(Long id, HttpSession session, RedirectAttributes attributes) {
+		User user = getUserFromSession(session);
+		if (user == null || !user.getRole().equals("ADMIN")) {
+			attributes.addFlashAttribute("fail", "Invalid Session");
+			return "redirect:/login";
+		} else {
+			Screen screen = screenRepository.findById(id).orElseThrow();
+			Theater theater = screen.getTheater();
+
+			if (showRepository.existsByScreen(screen)) {
+				attributes.addFlashAttribute("fail", "There are Shows Runing You can not Delete");
+				return "redirect:/manage-screens/" + theater.getId();
+			} else {
+				theater.setScreenCount(theater.getScreenCount() - 1);
+				theaterRepository.save(theater);
+				List<Seat> seats = seatRepository.findByScreenOrderBySeatRowAscSeatColumnAsc(screen);
+				seatRepository.deleteAll(seats);
+				screenRepository.deleteById(id);
+				attributes.addFlashAttribute("pass", "Screen Removed Success");
+				return "redirect:/manage-screens/" + theater.getId();
+			}
+		}
+	}
+
+	@Override
+	public String editScreen(Long id, HttpSession session, RedirectAttributes attributes, ModelMap map) {
+		User user = getUserFromSession(session);
+		if (user == null || !user.getRole().equals("ADMIN")) {
+			attributes.addFlashAttribute("fail", "Invalid Session");
+			return "redirect:/login";
+		} else {
+			Screen screen = screenRepository.findById(id).orElseThrow();
+			ScreenDto screenDto = new ScreenDto(screen.getName(), screen.getType(), screen.getTheater().getId());
+			map.put("screenDto", screenDto);
+			map.put("id", screen.getId());
+			return "edit-screen.html";
+		}
+	}
+
+	@Override
+	public String updateScreen(@Valid ScreenDto screenDto, Long id, BindingResult result, HttpSession session,
+			RedirectAttributes attributes, ModelMap map) {
+		User user = getUserFromSession(session);
+		if (user == null || !user.getRole().equals("ADMIN")) {
+			attributes.addFlashAttribute("fail", "Invalid Session");
+			return "redirect:/login";
+		} else {
+			if (result.hasErrors()) {
+				map.put("id", id);
+				return "edit-screen.html";
+			}
+			Screen screen = screenRepository.findById(id).orElseThrow();
+			screen.setName(screenDto.getName());
+			screen.setType(screenDto.getType());
+			screenRepository.save(screen);
+			attributes.addFlashAttribute("pass", "Screen Updated Success");
+			return "redirect:/manage-screens/" + screen.getTheater().getId();
+		}
+	}
+
+	@Override
+	public String manageSeats(Long id, HttpSession session, ModelMap map, RedirectAttributes attributes) {
+
+		User user = getUserFromSession(session);
+		if (user == null || !user.getRole().equals("ADMIN")) {
+			attributes.addFlashAttribute("fail", "Invalid Session");
+			return "redirect:/login";
+		}
+
+		Screen screen = screenRepository.findById(id).orElseThrow(() -> new RuntimeException("Screen not found"));
+
+		List<Seat> seats = seatRepository.findByScreenOrderBySeatRowAscSeatColumnAsc(screen);
+
+		// Group seats by row
+		Map<String, List<Seat>> seatsByRow = seats.stream()
+				.collect(Collectors.groupingBy(Seat::getSeatRow, LinkedHashMap::new, Collectors.toList()));
+
+		map.put("seatsByRow", seatsByRow);
+		map.put("screenId", id);
+
+		return "manage-seats";
+	}
+
+	@Override
+	public String addSeats(Long id, HttpSession session, ModelMap map, RedirectAttributes attributes) {
+		User user = getUserFromSession(session);
+		if (user == null || !user.getRole().equals("ADMIN")) {
+			attributes.addFlashAttribute("fail", "Invalid Session");
+			return "redirect:/login";
+		} else {
+			screenRepository.findById(id).orElseThrow();
+			map.put("id", id);
+			map.put("seatLayoutForm", new SeatLayoutForm());
+			return "add-seats.html";
+		}
+	}
+
+	@Override
+	public String saveSeats(Long screenId, SeatLayoutForm form, HttpSession session, RedirectAttributes attributes) {
+
+		User user = getUserFromSession(session);
+		if (user == null || !user.getRole().equals("ADMIN")) {
+			attributes.addFlashAttribute("fail", "Invalid Session");
+			return "redirect:/login";
+		}
+
+		Screen screen = screenRepository.findById(screenId).orElseThrow();
+
+		for (SeatRowDto row : form.getRows()) {
+			for (int i = 1; i <= row.getTotalSeats(); i++) {
+
+				Seat seat = new Seat();
+				seat.setScreen(screen);
+				seat.setSeatRow(row.getRowName());
+				seat.setSeatColumn(i);
+				seat.setSeatNumber(row.getRowName() + i);
+				seat.setCategory(row.getCategory());
+
+				seatRepository.save(seat);
+			}
+		}
+
+		attributes.addFlashAttribute("success", "Seats added successfully");
+		return "redirect:/manage-screens/" + screen.getTheater().getId();
+	}
+
+	@Override
+	public String manageMovies(HttpSession session, RedirectAttributes attributes, ModelMap map) {
+		User user = getUserFromSession(session);
+		if (user == null || !user.getRole().equals("ADMIN")) {
+			attributes.addFlashAttribute("fail", "Invalid Session");
+			return "redirect:/login";
+		} else {
+			List<Movie> movies = movieRepository.findAll();
+			map.put("movies", movies);
+			return "manage-movies.html";
+		}
+	}
+
+	@Override
+	public String loadAddMovie(MovieDto movieDto, RedirectAttributes attributes, HttpSession session) {
+		User user = getUserFromSession(session);
+		if (user == null || !user.getRole().equals("ADMIN")) {
+			attributes.addFlashAttribute("fail", "Invalid Session");
+			return "redirect:/login";
+		} else {
+			return "add-movie.html";
+		}
+	}
+
+	@Override
+	public String addMovie(MovieDto movieDto, BindingResult result, RedirectAttributes attributes,
+			HttpSession session) {
+		User user = getUserFromSession(session);
+		if (user == null || !user.getRole().equals("ADMIN")) {
+			attributes.addFlashAttribute("fail", "Invalid Session");
+			return "redirect:/login";
+		} else {
+
+			if (movieRepository.existsByNameAndReleaseDate(movieDto.getName(), movieDto.getReleaseDate()))
+				result.rejectValue("name", "error.name", "* Movie Already Exists");
+			if (movieDto.getImage().getSize() == 0)
+				result.rejectValue("image", "error.image", "* Image is Required");
+			if (result.hasErrors())
+				return "add-movie.html";
+
+			Movie movie = new Movie(null, movieDto.getName(), movieDto.getLanguages(), movieDto.getGenre(),
+					movieDto.getDuration(), cloudinaryHelper.generateImageLink(movieDto.getImage()),
+					movieDto.getTrailerLink(), movieDto.getDescription(), movieDto.getReleaseDate(),
+					movieDto.getCast());
+
+			movieRepository.save(movie);
+			attributes.addFlashAttribute("pass", "Movie Added Success");
+			return "redirect:/manage-movies";
+
+		}
+	}
+
+	@Override
+	public String manageShows(Long id, ModelMap map, RedirectAttributes attributes, HttpSession session) {
+		User user = getUserFromSession(session);
+		if (user == null || !user.getRole().equals("ADMIN")) {
+			attributes.addFlashAttribute("fail", "Invalid Session");
+			return "redirect:/login";
+		} else {
+			Screen screen = screenRepository.findById(id).orElseThrow();
+			List<Show> shows = showRepository.findByScreen(screen);
+			map.put("shows", shows);
+			map.put("id", id);
+			return "manage-shows";
+		}
+	}
+
+	@Override
+	public String addShow(Long id, ModelMap map, RedirectAttributes attributes, HttpSession session) {
+		User user = getUserFromSession(session);
+		if (user == null || !user.getRole().equals("ADMIN")) {
+			attributes.addFlashAttribute("fail", "Invalid Session");
+			return "redirect:/login";
+		} else {
+
+			Screen screen = screenRepository.findById(id).orElseThrow();
+			List<Seat> seats = seatRepository.findByScreenOrderBySeatRowAscSeatColumnAsc(screen);
+
+			List<Movie> movies = movieRepository.findAll();
+			if (!seats.isEmpty() && !movies.isEmpty()) {
+				map.put("movies", movies);
+				ShowDto showDto = new ShowDto();
+				showDto.setScreenId(screen.getId());
+				map.put("showDto", showDto);
+				return "add-show";
+			} else {
+				attributes.addFlashAttribute("fail", "First Add Movie and Add Seat Layout to continue");
+				return "redirect:/manage-screens/" + screen.getTheater().getId();
+			}
+		}
+	}
+
+	@Override
+	public String addShow(ShowDto showDto, BindingResult result, RedirectAttributes attributes, HttpSession session,
+			ModelMap map) {
+		User user = getUserFromSession(session);
+		if (user == null || !user.getRole().equals("ADMIN")) {
+			attributes.addFlashAttribute("fail", "Invalid Session");
+			return "redirect:/login";
+		} else {
+			Movie movie = movieRepository.findById(showDto.getMovieId()).orElseThrow();
+			Screen screen = screenRepository.findById(showDto.getScreenId()).orElseThrow();
+			if (showDto.getShowDate().isBefore(movie.getReleaseDate()))
+				result.rejectValue("showDate", "error.showDate", "* Show Date Should be After Movie Release");
+
+			List<Show> shows = showRepository.findByScreen(screen);
+			if (!shows.isEmpty()) {
+				boolean flag = false;
+				for (Show show : shows) {
+					if (show.getShowDate().isEqual(showDto.getShowDate())
+							&& showDto.getStartTime().isBefore(show.getEndTime())) {
+						flag = true;
+						break;
+					}
+				}
+				if (flag)
+					result.rejectValue("startTime", "error.startTime", "* In Same Time There is One More Show");
+			}
+
+			if (result.hasErrors()) {
+				List<Movie> movies = movieRepository.findAll();
+				map.put("movies", movies);
+				return "add-show";
+			} else {
+				Show show = new Show();
+				show.setMovie(movie);
+				show.setScreen(screen);
+				show.setShowDate(showDto.getShowDate());
+				show.setStartTime(showDto.getStartTime());
+				show.setTicketPrice(showDto.getTicketPrice());
+				show.setEndTime(show.getStartTime().plusHours(movie.getDuration().getHour())
+						.plusMinutes(movie.getDuration().getMinute() + 30));
+
+				List<ShowSeat> seats = new ArrayList<ShowSeat>();
+
+				List<Seat> exSeats = seatRepository.findByScreenOrderBySeatRowAscSeatColumnAsc(screen);
+				for (Seat seat : exSeats) {
+					ShowSeat showSeat = new ShowSeat();
+					showSeat.setBooked(false);
+					showSeat.setSeat(seat);
+					seats.add(showSeat);
+				}
+
+				show.setSeats(seats);
+				showRepository.save(show);
+				attributes.addFlashAttribute("pass", "Show Added Success");
+				return "redirect:/manage-shows/" + showDto.getScreenId();
+			}
+
+		}
+	}
+
+	@Override
+	public String loadMain(ModelMap map) {
+		Set<Movie> movies = showRepository.findByShowDateAfter(LocalDate.now().minusDays(1)).stream()
+				.map(Show::getMovie).collect(Collectors.toSet());
+
+		map.put("movies", movies);
+		return "main";
+	}
+
+	@Override
+	public String bookMovie(Long id, HttpSession session, RedirectAttributes attributes, ModelMap map) {
+		Movie movie = movieRepository.findById(id).orElseThrow(() -> new RuntimeException("Movie not found"));
+
+		List<String> showDates = showRepository.findByMovieAndShowDateAfter(movie, LocalDate.now().minusDays(1))
+				.stream().map(Show::getShowDate) // LocalDate
+				.distinct() // remove duplicates
+				.sorted() // sort ascending
+				.map(LocalDate::toString) // JS-safe string
+				.toList();
+		map.put("movie", movie);
+		map.put("showDate", showDates);
+
+		return "display-shows";
+	}
+
+	@Override
+	public String deleteShow(Long id, HttpSession session, RedirectAttributes attributes) {
+		User user = getUserFromSession(session);
+		if (user == null || !user.getRole().equals("ADMIN")) {
+			attributes.addFlashAttribute("fail", "Invalid Session");
+			return "redirect:/login";
+		} else {
+			Long screenId = showRepository.findById(id).orElseThrow().getScreen().getId();
+			showRepository.deleteById(id);
+			attributes.addFlashAttribute("pass", "Show Removed Success");
+			return "redirect:/manage-shows/" + screenId;
+		}
+	}
+
+	@Override
+	public String deleteMovie(Long id, HttpSession session, RedirectAttributes attributes) {
+		User user = getUserFromSession(session);
+		if (user == null || !user.getRole().equals("ADMIN")) {
+			attributes.addFlashAttribute("fail", "Invalid Session");
+			return "redirect:/login";
+		} else {
+			Movie movie = movieRepository.findById(id).orElseThrow();
+			if (showRepository.existsByMovie(movie)) {
+				attributes.addFlashAttribute("fail", "There are Shwos Running So can not Delete");
+				return "redirect:/manage-movies";
+			} else {
+				movieRepository.deleteById(id);
+				attributes.addFlashAttribute("pass", "Movie Removed Success");
+				return "redirect:/manage-movies";
+			}
+		}
+	}
+
+	@Override
+	public String displayShowsOnDate(LocalDate date, Long movieId, RedirectAttributes attributes, ModelMap map) {
+		Movie movie = movieRepository.findById(movieId).orElseThrow();
+		List<Show> shows = showRepository.findByShowDateAndMovie(date, movie);
+		Map<Theater, List<Show>> theaters = new HashMap<Theater, List<Show>>();
+		for (Show show : shows) {
+			List<Show> sh;
+			if (theaters.containsKey(show.getScreen().getTheater())) {
+				sh = theaters.get(show.getScreen().getTheater());
+			} else {
+				sh = new ArrayList<Show>();
+			}
+			sh.add(show);
+			theaters.put(show.getScreen().getTheater(), sh);
+		}
+		map.put("theaters", theaters);
+		return "display-theaters.html";
+	}
+
+	@Override
+	public String showSeats(Long id, HttpSession session, RedirectAttributes attributes, ModelMap map) {
+
+		User user = getUserFromSession(session);
+		if (user == null || !user.getRole().equals("USER")) {
+			attributes.addFlashAttribute("fail", "Login to Continue Booking");
+			return "redirect:/login";
+		}
+
+		Show show = showRepository.findById(id).orElseThrow();
+
+		Map<String, List<ShowSeat>> seatsByRow = show.getSeats().stream()
+				.collect(Collectors.groupingBy(s -> s.getSeat().getSeatRow(), LinkedHashMap::new, Collectors.toList()));
+
+		map.put("seatsByRow", seatsByRow);
+		map.put("showId", id);
+
+		return "select-seats";
+	}
+
+	@Override
+	public String confirmBooking(Long showId, Long[] seatIds, HttpSession session, ModelMap map,
+			RedirectAttributes attributes) throws RazorpayException {
+		User user = getUserFromSession(session);
+		if (user == null || !user.getRole().equals("USER")) {
+			attributes.addFlashAttribute("fail", "Login to Continue Booking");
+			return "redirect:/login";
+		}
+		if (seatIds == null || seatIds.length == 0) {
+			attributes.addFlashAttribute("fail", "Please select at least one seat");
+			return "redirect:/show-seats/" + showId;
+		}
+
+		Show show = showRepository.findById(showId).orElseThrow();
+
+		Set<Long> selectedSeatIds = new HashSet<>(Arrays.asList(seatIds));
+
+		List<ShowSeat> showSeats = new ArrayList<>();
+		for (ShowSeat seat : show.getSeats()) {
+			if (selectedSeatIds.contains(seat.getId())) {
+				showSeats.add(seat);
+			}
+		}
+
+		double amount = show.getTicketPrice() * seatIds.length;
+
+		RazorpayClient razorpay = new RazorpayClient(rzrKey, rzrSecret);
+
+		JSONObject orderRequest = new JSONObject();
+		orderRequest.put("amount", amount * 100);
+		orderRequest.put("currency", "INR");
+
+		Order order = razorpay.orders.create(orderRequest);
+		String id = order.get("id");
+		map.put("key", rzrKey);
+		map.put("amount", amount * 100);
+		map.put("currency", "INR");
+		map.put("orderId", id);
+
+		map.put("show", show);
+		map.put("showSeats", showSeats);
+		map.put("user", user);
+
+		BookedTicket ticket = new BookedTicket();
+		ticket.setMovieName(show.getMovie().getName());
+		ticket.setOrderId(id);
+		ticket.setScreenName(show.getScreen().getName());
+		String[] seatNumbers = showSeats.stream().map(x -> x.getSeat().getSeatNumber()).collect(Collectors.joining(","))
+				.split(",");
+		ticket.setSeatNumber(seatNumbers);
+		ticket.setShowDate(show.getShowDate().toString());
+		ticket.setShowTiming(show.getStartTime().toString());
+		ticket.setTheaterName(show.getScreen().getTheater().getName());
+		ticket.setTicketCount(seatNumbers.length);
+		ticket.setTicketPrice(show.getTicketPrice());
+		ticket.setShowId(showId);
+		;
+		redisService.saveTicket(id, ticket);
+
+		return "confirm-ticket";
+	}
+
+	@Override
+	public String confirmTicket(HttpSession session, ModelMap map, RedirectAttributes attributes,
+			String razorpay_order_id, String razorpay_payment_id) throws IOException, WriterException {
+		User user = getUserFromSession(session);
+		if (user == null || !user.getRole().equals("USER")) {
+			attributes.addFlashAttribute("fail", "Login to Continue Booking");
+			return "redirect:/login";
+		}
+		BookedTicket ticket = redisService.getTicket(razorpay_order_id);
+		if (ticket == null) {
+			attributes.addFlashAttribute("fail", "Something Went Wrong try Again");
+			return "redirect:/login";
+		}
+		ticket.setPaymentId(razorpay_payment_id);
+		ticket.setUser(user);
+		byte[] qr = qrHelper.qrCreator(ticket.getMovieName() + "-" + ticket.getTheaterName() + "-"
+				+ ticket.getShowTiming() + "-" + Arrays.toString(ticket.getSeatNumber()));
+		ticket.setQrUrl(cloudinaryHelper.saveTicketQr(qr));
+		ticketRepository.save(ticket);
+
+		Show show = showRepository.findById(ticket.getShowId()).orElseThrow();
+		for (ShowSeat seat : show.getSeats()) {
+			if (Arrays.asList(ticket.getSeatNumber()).contains(seat.getSeat().getSeatNumber())) {
+				seat.setBooked(true);
+				showSeatRepository.save(seat);
+			}
+		}
+		map.put("ticket", ticket);
+		return "view-ticket.html";
+	}
+
+}
