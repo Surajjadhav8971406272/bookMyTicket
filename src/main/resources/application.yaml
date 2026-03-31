@@ -30,6 +30,10 @@ spring:
           starttls:
             enable: true
 
+  data:
+    redis:
+      url: ${SPRING_REDIS_URL}
+
 admin:
   email: admin@gmail.com
   password: admin
