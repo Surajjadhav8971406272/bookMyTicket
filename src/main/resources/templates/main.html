@@ -6,55 +6,66 @@
 <title>BookMyTicket</title>
 
 <link rel="icon" type="image/svg+xml" href="/favicon.svg">
-<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
-<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;900&display=swap" rel="stylesheet">
+<link
+	href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css"
+	rel="stylesheet">
+<link
+	href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;900&display=swap"
+	rel="stylesheet">
 
 <style>
 :root {
-	--bg-main-1: #2b2f3a;
-	--bg-main-2: #1c1f26;
-	--bg-card-1: #262a33;
-	--bg-card-2: #1f232b;
-	--border-soft: #343842;
+	--bg-main: #0f172a;
+	--bg-card: #111827;
+	--border: #1f2937;
 	--text-main: #e5e7eb;
 	--text-muted: #9ca3af;
 	--accent: #6496ff;
 	--accent-pink: #ff4081;
 }
 
-/* ===== GLOBAL (FINAL MATCH) ===== */
+/* ===== GLOBAL ===== */
 body {
 	font-family: "Poppins", sans-serif;
-	background: linear-gradient(180deg, var(--bg-main-1), var(--bg-main-2));
+	background: radial-gradient(circle at top, #1e293b, var(--bg-main));
 	color: var(--text-main);
 	min-height: 100vh;
 }
 
-/* ===== NAVBAR (MATCHED) ===== */
+/* ===== NAVBAR ===== */
 .navbar {
-	background: rgba(28, 31, 38, 0.96) !important;
-	backdrop-filter: blur(12px);
-	border-bottom: 1px solid var(--border-soft);
-	padding: .8rem 2rem;
+	background: rgba(17, 24, 39, .85) !important;
+	backdrop-filter: blur(14px);
+	border-bottom: 1px solid var(--border);
+	padding: .9rem 2rem;
 }
 
 .navbar-brand {
 	font-weight: 900;
-	font-size: 1.45rem;
+	font-size: 1.5rem;
 	background: linear-gradient(135deg, var(--accent), var(--accent-pink));
 	-webkit-background-clip: text;
 	-webkit-text-fill-color: transparent;
 }
 
-/* ===== HERO (COMPACT) ===== */
+.nav-link {
+	color: var(--text-muted) !important;
+	font-weight: 600;
+}
+
+.nav-link:hover {
+	color: var(--accent-pink) !important
+}
+
+/* ===== HERO ===== */
 .hero {
-	padding: 55px 20px 35px;
+	padding: 100px 20px;
 	text-align: center;
-	background: transparent;
+	position: relative;
 }
 
 .hero h1 {
-	font-size: 2.4rem;
+	font-size: 3.2rem;
 	font-weight: 900;
 	background: linear-gradient(135deg, var(--accent), var(--accent-pink));
 	-webkit-background-clip: text;
@@ -63,168 +74,253 @@ body {
 
 .hero p {
 	color: var(--text-muted);
-	font-size: 1rem;
-	margin-top: 6px;
+	font-size: 1.15rem;
+	margin-top: 10px;
 }
 
-/* ===== MOVIES SECTION ===== */
+.hero .btn {
+	margin-top: 25px;
+	padding: 14px 36px;
+	font-weight: 700;
+	border-radius: 14px;
+	background: linear-gradient(135deg, var(--accent), var(--accent-pink));
+	border: none;
+	box-shadow: 0 15px 35px rgba(100, 150, 255, .45);
+}
+
+.hero .btn:hover {
+	transform: translateY(-3px);
+	box-shadow: 0 25px 55px rgba(100, 150, 255, .6);
+}
+
+/* ===== MOVIES ===== */
 #movies {
-	padding: 35px 0 70px;
+	padding: 90px 0;
 }
 
 #movies h2 {
 	text-align: center;
 	font-weight: 900;
-	margin-bottom: 35px;
+	margin-bottom: 60px;
 }
 
-/* ===== ADMIN-STYLE MOVIE CARD (MATCHED) ===== */
+/* ===== MOVIE CARD ===== */
 .movie-card {
-	background: linear-gradient(180deg, var(--bg-card-1), var(--bg-card-2));
-	border: 1px solid var(--border-soft);
+	background: linear-gradient(180deg, #111827, #0b1220);
+	border: 1px solid var(--border);
 	border-radius: 18px;
 	overflow: hidden;
-	box-shadow: 0 25px 60px rgba(0,0,0,.7);
-	transition: all .35s ease;
+	box-shadow: 0 20px 45px rgba(0, 0, 0, .6);
+	transition: .4s ease;
 	height: 100%;
-	display: flex;
-	flex-direction: column;
 }
 
 .movie-card:hover {
-	transform: translateY(-8px);
+	transform: translateY(-10px) scale(1.02);
+	box-shadow: 0 35px 80px rgba(0, 0, 0, .8);
 	border-color: var(--accent);
-	box-shadow: 0 35px 85px rgba(0,0,0,.9);
 }
 
 .movie-card img {
-	height: 250px;
+	height: 280px;
 	object-fit: cover;
-	border-bottom: 1px solid var(--border-soft);
 }
 
 .movie-card .card-body {
-	padding: 20px;
+	padding: 22px;
 	display: flex;
 	flex-direction: column;
 }
 
 .movie-card h5 {
-	font-weight: 800;
-	font-size: 1.05rem;
+	font-weight: 700;
 	margin-bottom: 6px;
 }
 
-.movie-meta {
-	font-size: .85rem;
-	color: var(--text-muted);
-	margin-bottom: 18px;
+.movie-card .text-muted {
+	color: var(--text-muted) !important;
+	font-size: .9rem;
 }
 
-/* ===== BUTTON ===== */
 .movie-card .btn {
 	margin-top: auto;
-	padding: 10px;
 	border-radius: 12px;
-	font-weight: 700;
-	font-size: .85rem;
-	border: none;
 	background: linear-gradient(135deg, var(--accent), var(--accent-pink));
-	box-shadow: 0 12px 30px rgba(100,150,255,.45);
+	border: none;
+	font-weight: 700;
 }
 
-.movie-card .btn:hover {
-	transform: translateY(-2px);
-	box-shadow: 0 20px 45px rgba(100,150,255,.6);
+/* ===== BUTTONS ===== */
+.btn-outline-light {
+	border: 2px solid var(--accent);
+	color: var(--accent);
+	font-weight: 700;
+}
+
+.btn-outline-light:hover {
+	background: var(--accent);
+	color: #fff;
+}
+
+.btn-danger {
+	background: linear-gradient(135deg, #ff4d4d, #ff1e1e);
+	border: none;
+}
+
+.btn-primary {
+	background: linear-gradient(135deg, var(--accent), var(--accent-pink));
+	border: none;
 }
 
 /* ===== FOOTER ===== */
 footer {
-	border-top: 1px solid var(--border-soft);
+	border-top: 1px solid var(--border);
 	text-align: center;
-	padding: 22px;
+	padding: 25px;
 	color: var(--text-muted);
-	margin-top: 60px;
+	margin-top: 80px;
 }
 
-/* ===== RESPONSIVE ===== */
-@media (max-width:768px) {
-	.hero h1 { font-size: 2rem; }
-	.movie-card img { height: 220px; }
+/* ===== TOASTS ===== */
+.toastify-container {
+	position: fixed;
+	top: 20px;
+	right: 20px;
+	z-index: 9999;
+}
+
+.toastify {
+	min-width: 300px;
+	padding: 14px 18px;
+	border-radius: 12px;
+	display: flex;
+	gap: 12px;
+	color: #fff;
+	font-weight: 600;
+	box-shadow: 0 20px 45px rgba(0, 0, 0, .7);
+	animation: slideIn .4s ease;
+}
+
+.toastify.success {
+	background: linear-gradient(135deg, #22c55e, #16a34a)
+}
+
+.toastify.error {
+	background: linear-gradient(135deg, #ff4081, #ff6a6a)
+}
+
+.toastify-close {
+	background: rgba(255, 255, 255, .25);
+	border: none;
+	width: 26px;
+	height: 26px;
+	border-radius: 50%;
+	color: #fff;
+	font-weight: 700;
+}
+
+@keyframes slideIn {
+	from {transform: translateX(400px);
+	opacity: 0
+}
+
+to {
+	transform: translateX(0);
+	opacity: 1
+}
+
+}
+@media ( max-width :768px) {
+	.hero h1 {
+		font-size: 2.2rem
+	}
+	.movie-card img {
+		height: 230px
+	}
 }
 </style>
 </head>
 
 <body>
 
-<!-- NAVBAR -->
-<nav class="navbar navbar-expand-lg">
-	<a class="navbar-brand" href="/">🎬 BookMyTicket</a>
+	<!-- NAVBAR -->
+	<nav class="navbar navbar-expand-lg">
+		<a class="navbar-brand" href="/">🎬 BookMyTicket</a>
 
-	<div class="collapse navbar-collapse justify-content-end">
-		<div th:if="${session.user == null}">
-			<a href="/login" class="btn btn-outline-light me-2">Login</a>
-			<a href="/register" class="btn btn-primary">Register</a>
+		<button class="navbar-toggler" type="button" data-bs-toggle="collapse"
+			data-bs-target="#navMenu">
+			<span class="navbar-toggler-icon"></span>
+		</button>
+
+		<div id="navMenu" class="collapse navbar-collapse justify-content-end">
+
+			<div th:if="${session.user == null}">
+				<a href="/login" class="btn btn-outline-light me-2">Login</a> <a
+					href="/register" class="btn btn-primary">Register</a>
+			</div>
+
+			<div th:if="${session.user != null}"
+				class="d-flex align-items-center">
+				<span class="me-3 fw-semibold"
+					th:text="'Hello, ' + ${session.user.name}"></span> <a
+					th:if="${session.user.role=='USER'}" href="/bookings"
+					class="btn btn-outline-light me-2">My Bookings</a> <a
+					th:if="${session.user.role=='ADMIN'}" href="/manage-movies"
+					class="btn btn-danger me-2">Manage Movies</a> <a
+					th:if="${session.user.role=='ADMIN'}" href="/manage-theaters"
+					class="btn btn-danger me-2">Manage Theaters</a> <a
+					th:if="${session.user.role=='ADMIN'}" href="/manage-users"
+					class="btn btn-danger me-2">Manage Users</a> <a href="/logout"
+					class="btn btn-primary">Logout</a>
+			</div>
+
 		</div>
+	</nav>
 
-		<div th:if="${session.user != null}" class="d-flex align-items-center">
-			<span class="me-3 fw-semibold"
-				  th:text="'Hello, ' + ${session.user.name}"></span>
-
-			<a th:if="${session.user.role=='USER'}"
-			   href="/bookings"
-			   class="btn btn-outline-light me-2">My Bookings</a>
-
-			<a th:if="${session.user.role=='ADMIN'}"
-			   href="/manage-movies"
-			   class="btn btn-danger me-2">Manage Movies</a>
-
-			<a th:if="${session.user.role=='ADMIN'}"
-			   href="/manage-theaters"
-			   class="btn btn-danger me-2">Manage Theaters</a>
-
-			<a th:if="${session.user.role=='ADMIN'}"
-			   href="/manage-users"
-			   class="btn btn-danger me-2">Manage Users</a>
-
-			<a href="/logout" class="btn btn-primary">Logout</a>
+	<!-- TOASTS -->
+	<div class="toastify-container">
+		<div th:if="${pass}" class="toastify success">
+			<span th:text="${pass}"></span>
+		</div>
+		<div th:if="${fail}" class="toastify error">
+			<span th:text="${fail}"></span>
 		</div>
 	</div>
-</nav>
 
-<!-- HERO -->
-<section class="hero">
-	<h1>Book Your Favorite Movies</h1>
-	<p>Fast • Secure • Premium Experience</p>
-</section>
+	<!-- HERO -->
+	<section class="hero">
+		<h1>Book Your Favorite Movies</h1>
+		<p>Fast • Secure • Premium Experience</p>
+		<a href="#movies" class="btn">Browse Movies</a>
+	</section>
 
-<!-- MOVIES -->
-<section class="container" id="movies" th:if="${!movies.isEmpty()}">
-	<h2>Now Showing</h2>
+	<!-- MOVIES -->
+	<section class="container" id="movies" th:if="${!movies.isEmpty()}">
+		<h2>Now Showing</h2>
 
-	<div class="row g-4">
-		<div class="col-xl-3 col-lg-4 col-md-4 col-sm-6"
-		     th:each="movie:${movies}">
-			<div class="movie-card">
-				<img th:src="${movie.imageLink}">
-				<div class="card-body">
-					<h5 th:text="${movie.name}"></h5>
-					<div class="movie-meta">
-						<span th:text="${movie.genre}"></span> •
-						<span th:text="${movie.duration}"></span> hrs
+		<div class="row g-4">
+			<div class="col-lg-3 col-md-4 col-sm-6" th:each="movie:${movies}">
+				<div class="movie-card">
+					<img th:src="${movie.imageLink}">
+					<div class="card-body">
+						<h5 th:text="${movie.name}"></h5>
+						<p class="text-muted">
+							<span th:text="${movie.genre}"></span> • <span
+								th:text="${movie.duration}"></span> hrs
+						</p>
+						<a th:href="'/book/movie/'+${movie.id}"
+							class="btn btn-primary w-100">Book Now</a>
 					</div>
-					<a th:href="'/book/movie/'+${movie.id}"
-					   class="btn btn-primary w-100">Book Now</a>
 				</div>
 			</div>
 		</div>
-	</div>
-</section>
+	</section>
 
-<footer>
-	<p>© 2025 BookMyTicket — All Rights Reserved</p>
-</footer>
+	<footer>
+		<p>© 2025 BookMyTicket — All Rights Reserved</p>
+	</footer>
 
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+	<script
+		src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
 </body>
 </html>
