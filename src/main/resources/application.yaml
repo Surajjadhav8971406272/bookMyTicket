@@ -1,15 +1,12 @@
 server:
-  port: ${PORT:8080}
-
+  port: 8080
 spring:
   application:
     name: book-my-ticket
-
   datasource:
-    url: jdbc:mysql://${MYSQLHOST}:${MYSQLPORT}/${MYSQLDATABASE}
-    username: ${MYSQLUSER}
-    password: ${MYSQLPASSWORD}
-
+    url: jdbc:mysql://localhost:3306/book-my-ticket?createDatabaseIfNotExist=true
+    username: root
+    password: Suraj@123
   jpa:
     hibernate:
       ddl-auto: update
@@ -17,26 +14,22 @@ spring:
     properties:
       hibernate:
         '[format_sql]': true
-
   data:
     redis:
-      url: ${SPRING_REDIS_URL}
-
+      url: redis://localhost:6379
   mail:
     host: smtp.gmail.com
     port: 587
-    username: ${SPRING_MAIL_USERNAME}
-    password: ${SPRING_MAIL_PASSWORD}
+    username: suraj.parvam@gmail.com
+    password: ${APP_PASSWORD}
     properties:
       mail:
         smtp:
           auth: true
           starttls:
             enable: true
-
 admin:
   email: admin@gmail.com
   password: admin
-
 cloudinary:
   url: ${CLOUDINARY_URL}
